@@ -10,4 +10,5 @@ from ._net2 import route2
 from ._net2 import route3
 from ._net2 import create_grid
 from ._net2 import route_to_gdf
-from ._net2 import data
+from ._net2 import transform
+from ._data import data

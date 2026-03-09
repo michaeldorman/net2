@@ -1,7 +1,6 @@
 [build-system]
 requires = [
     "hatchling >= 1.26",
-    "numpy >= 2.4.2",
     "geopandas >= 1.1.2",
     "networkx >= 3.6.1"
 ]
@@ -9,7 +8,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "net2"
-version = "0.0.3"
+version = "0.0.4"
 authors = [
   { name="Michael Dorman", email="dorman@post.bgu.ac.il" },
 ]
