@@ -4,6 +4,49 @@ import geopandas as gpd
 import pyproj
 import shapely
 import networkx as nx
+import osmnx as ox
+
+def prepare_ox(N: nx.Graph):
+    """
+    Pre-process network returned from `ox.graph_from_place` or similar `osmnx` function
+    
+    Parameters
+    ----------
+    network : `networkx` graph
+        Network
+
+    Returns
+    -------
+    `networkx` graph
+        Modified network
+    """
+    N = N.copy()
+    N = ox.add_edge_speeds(N)
+    N = ox.add_edge_travel_times(N)
+    N = ox.convert.to_digraph(N, weight='travel_time')
+    N = prepare(N)
+    for i in N.nodes:
+        N.nodes[i]['geometry'] = shapely.Point(N.nodes[i]['x'], N.nodes[i]['y'])
+    for u,v in N.edges:
+        e = N.edges[u, v]
+        if 'geometry' not in e:
+            geom = shapely.LineString([N.nodes[u]['geometry'], N.nodes[v]['geometry']])
+            N[u][v]['geometry'] = geom
+    keep = ['geometry']
+    for i in N.nodes:
+        for attr in list(N.nodes[i].keys()):
+            if attr not in keep: 
+                del N.nodes[i][attr]
+    keep = ['geometry', 'length', 'speed_kph', 'time']
+    for u,v in N.edges:
+        for attr in list(N.edges[u,v].keys()):
+            if attr not in keep: 
+                del N.edges[u,v][attr]
+    for u,v in N.edges:
+        N[u][v]['speed'] = N[u][v]['speed_kph']
+        del N[u][v]['speed_kph']
+    N = transform(N, 3857)
+    return N
 
 def prepare(N: nx.Graph, ids_to_int=True):
     """
