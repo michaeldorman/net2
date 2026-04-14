@@ -6,7 +6,7 @@ import shapely
 import networkx as nx
 import osmnx as ox
 
-def prepare_ox(N: nx.Graph):
+def prepare_ox(N: nx.MultiDiGraph) -> nx.DiGraph:
     """
     Pre-process network returned from `ox.graph_from_place` or similar `osmnx` function
     
@@ -48,7 +48,7 @@ def prepare_ox(N: nx.Graph):
     N = transform(N, 3857)
     return N
 
-def prepare(N: nx.Graph, ids_to_int=True):
+def prepare(N: nx.Graph | nx.DiGraph, ids_to_int=True) -> nx.Graph | nx.DiGraph:
     """
     Standardize spatial `networkx` network object
     
@@ -100,7 +100,7 @@ def prepare(N: nx.Graph, ids_to_int=True):
             N[u][v]['time'] = float(N[u][v]['time'])
     return N
 
-def pos(N: nx.Graph):
+def pos(N: nx.Graph | nx.DiGraph) -> dict:
     """
     Nenerate `dict` with node coordinates, to be passed to `pos` parameter of `nx.draw`
     
@@ -116,7 +116,7 @@ def pos(N: nx.Graph):
     """
     return {i: [N.nodes[i]['geometry'].x, N.nodes[i]['geometry'].y] for i in N.nodes}
 
-def nodes_to_gdf(N: nx.Graph):
+def nodes_to_gdf(N: nx.Graph | nx.DiGraph) -> gpd.GeoDataFrame:
     """
     Extract network nodes as a `GeoDataFrame`
 
@@ -130,15 +130,15 @@ def nodes_to_gdf(N: nx.Graph):
     `GeoDataFrame`
         Point layer of the network nodes
     """
-    geom = []
-    node_id = []
+    geoms = []
+    ids = []
     for i in N.nodes:
-        node_id.append(i)
-        geom.append(N.nodes[i]['geometry'])
-    nodes = gpd.GeoDataFrame({'id':node_id, 'geometry':geom}, crs=N.graph['crs'])
+        ids.append(i)
+        geoms.append(N.nodes[i]['geometry'])
+    nodes = gpd.GeoDataFrame({'id': ids, 'geometry': geoms}, crs=N.graph['crs'])
     return nodes
 
-def edges_to_gdf(N: nx.Graph):
+def edges_to_gdf(N: nx.Graph | nx.DiGraph) -> gpd.GeoDataFrame:
     """
     Extract network edges as a `GeoDataFrame`
 
@@ -156,7 +156,7 @@ def edges_to_gdf(N: nx.Graph):
     edges = gpd.GeoDataFrame(edges, crs=N.graph['crs'])
     return edges
 
-def nearest_node(N: nx.Graph, geom: shapely.geometry.base.BaseGeometry) -> tuple:
+def nearest_node(N: nx.Graph | nx.DiGraph, geom: shapely.geometry.base.BaseGeometry) -> tuple:
     """
     Find the nearest network node to the specified geometry
     
@@ -175,13 +175,13 @@ def nearest_node(N: nx.Graph, geom: shapely.geometry.base.BaseGeometry) -> tuple
     min_distance = float('inf')
     nearest_node = None
     for i in N.nodes:
-        distance = geom.distance(N.nodes[i]['geometry'])
-        if distance < min_distance:
-            min_distance = distance
+        d = geom.distance(N.nodes[i]['geometry'])
+        if d < min_distance:
+            min_distance = d
             nearest_node = i
     return nearest_node, min_distance
 
-def nearest_edge(N: nx.Graph, geom: shapely.geometry.base.BaseGeometry) -> tuple:
+def nearest_edge(N: nx.Graph | nx.DiGraph, geom: shapely.geometry.base.BaseGeometry) -> tuple:
     """
     Find the nearest network edge to the specified geometry
     
@@ -201,13 +201,13 @@ def nearest_edge(N: nx.Graph, geom: shapely.geometry.base.BaseGeometry) -> tuple
     nearest_edge = None
     for i in N.edges:
         geom_edge = N.edges[i]['geometry']
-        distance = geom.distance(geom_edge)
-        if distance < min_distance:
-            min_distance = distance
+        d = geom.distance(geom_edge)
+        if d < min_distance:
+            min_distance = d
             nearest_edge = i
     return nearest_edge, min_distance
 
-def split_edge(N: nx.Graph, node_id, e, pnt_on_line: shapely.geometry.Point, buffer_size):
+def split_edge(N: nx.Graph | nx.DiGraph, node_id, e, pnt_on_line: shapely.geometry.Point, buffer_size: int | float) -> nx.Graph | nx.DiGraph:
     pnt_on_line_b = pnt_on_line.buffer(buffer_size)
     first_seg, buff_seg, last_seg = shapely.ops.split(N.edges[e]['geometry'], pnt_on_line_b).geoms
     N.edges[e]['geometry'] = shapely.LineString(list(first_seg.coords) + list(pnt_on_line.coords) + list(last_seg.coords))
@@ -226,7 +226,7 @@ def split_edge(N: nx.Graph, node_id, e, pnt_on_line: shapely.geometry.Point, buf
 def is_same(a, b, threshold=0.001):
     return abs(a - b) < threshold
 
-def add_node(N: nx.Graph, pnt: shapely.geometry.Point, buffer_size=1e-8):
+def add_node(N: nx.Graph | nx.DiGraph, pnt: shapely.geometry.Point, buffer_size=1e-8) -> nx.Graph | nx.DiGraph:
     """
     Insert new node into an edge
     
@@ -274,7 +274,7 @@ def add_node(N: nx.Graph, pnt: shapely.geometry.Point, buffer_size=1e-8):
         N = split_edge(N, node_id, edge_id, pnt_on_line, buffer_size)
     return N, node_id, dist_to_edge
 
-def route1(N: nx.graph, node_start, node_end, weight: str):
+def route1(N: nx.Graph | nx.DiGraph, node_start, node_end, weight: str) -> dict:
     """
     Find optimal route between specified nodes.
     
@@ -305,7 +305,7 @@ def route1(N: nx.graph, node_start, node_end, weight: str):
     except:
         return {'route': np.nan, 'weight': np.nan}
 
-def route2(N: nx.graph, start: shapely.geometry.Point, end: shapely.geometry.Point, weight: str):
+def route2(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely.geometry.Point, weight: str) -> dict:
     """
     Find optimal route between specified point locations, while inserting new nodes into existing edges when necessary.
     
@@ -351,7 +351,7 @@ def route2(N: nx.graph, start: shapely.geometry.Point, end: shapely.geometry.Poi
             'network': network
         }
 
-def route3(N: nx.graph, start: shapely.geometry.Point, end: shapely.geometry.Point, time_weight: str, walking_speed=1.4):
+def route3(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely.geometry.Point, time_weight: str, walking_speed=1.4) -> dict:
     """
     Find optimal route between specified point locations, while inserting new nodes into existing edges when necessary, while choosing between 'walking' (in a straight line) or 'walking+driving' (walking to and from network, then driving along network).
     
@@ -390,7 +390,7 @@ def route3(N: nx.graph, start: shapely.geometry.Point, end: shapely.geometry.Poi
     else:
         return {'weight': time_walking, 'mode': 'walking'}
 
-def create_grid(bounds, res, crs=None):
+def create_grid(bounds: list | tuple, res: int | float, crs=None) -> gpd.GeoDataFrame:
     """
     Create a regular grid of rectangles of size `res*res`, covering the given `bounds`
 
@@ -398,7 +398,7 @@ def create_grid(bounds, res, crs=None):
     ----------
     bounds : `list` or `tuple` of the form `[xmin,ymin,xmax,ymax]`, e.g., as returned by `shapely` method `.bounds`
         Network
-    res : `int`
+    res : `int` or `float`
         Resolution
     crs : object, optional
         Coordinate Reference System (CRS). Can be anything accepted by `pyproj.CRS.from_user_input()`, or `None`
@@ -423,7 +423,7 @@ def create_grid(bounds, res, crs=None):
     grid = grid[sel]
     return grid
 
-def route_to_gdf(N: nx.graph, route: list):
+def route_to_gdf(N: nx.Graph | nx.DiGraph, route: list) -> gpd.GeoDataFrame:
     """
     Convert route (`list` of node IDs) to `GeoDataFrame` with `'LineString'` geometries
     
@@ -453,7 +453,7 @@ def route_to_gdf(N: nx.graph, route: list):
         result = gpd.GeoDataFrame(result, crs=N.graph['crs'])
     return result
 
-def transform(N: nx.graph, to_crs: int):
+def transform(N: nx.Graph | nx.DiGraph, to_crs) -> nx.Graph | nx.DiGraph:
     """
     Transform (i.e., reproject) network to the specified Coordinate Reference System (CRS)
     
@@ -461,8 +461,8 @@ def transform(N: nx.graph, to_crs: int):
     ----------
     N : `networkx` graph
         Network
-    to_crs : `int` 
-        EPSG code of target CRS
+    to_crs : object
+        Target Coordinate Reference System (CRS). Can be anything accepted by `pyproj.CRS.from_user_input()`
  
     Returns
     -------

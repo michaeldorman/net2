@@ -1,6 +1,8 @@
 # `net2`
 
 
+![https://img.shields.io/pypi/v/net2](https://pypi.org/project/net2/.png)
+
 ## Overview
 
 `net2` is a Python package for working with spatial networks.
@@ -8,14 +10,74 @@
 ## Data structures
 
 `net2` is intended to work with spatial network data represented using
-`networkx.DiGraph` object, with the following conventions:
+`networkx.DiGraph` objects, following several conventions:
 
+- An object of type `nx.Graph` or `nx.DiGraph`
 - The network is associated with:
   - `'crs'` (`None` or `int`)
 - Node IDs are `int`
-- The nodes are associated with:
+- Nodes are associated with:
   - `'geometry'` (`shapely`)
-- The edges are associated with:
+- Edges are associated with:
   - `'geometry'` (`shapely`)
   - `'length'` (`float`, in $m$)
   - `'time'` (`float`, in $sec$)
+
+## Installation
+
+The package can be installed with:
+
+``` sh
+pip install net2
+```
+
+## Use
+
+Once installed, the package can be loaded with:
+
+``` python
+import net2
+```
+
+## Sample data
+
+The package comes with a small spatial network for demonstration,
+accessible as follows:
+
+``` python
+G = net2.data['roads']
+G
+```
+
+    <networkx.classes.digraph.DiGraph at 0x7e6091f35f40>
+
+Here is a plot of the network:
+
+``` python
+import networkx as nx
+nx.draw(G, with_labels=True, pos=net2.pos(G))
+```
+
+![](README_files/figure-commonmark/cell-4-output-1.png)
+
+## Example
+
+``` python
+import matplotlib.pyplot as plt
+import shapely
+pnt1 = shapely.Point(4100, 3100)
+pnt2 = shapely.Point(1100, 3700)
+x = net2.route2(G, pnt1, pnt2, 'length')
+fig, ax = plt.subplots()
+nx.draw(x['network'], with_labels=True, pos=net2.pos(x['network']), edge_color='grey', width=0.1, ax=ax)
+nx.draw_networkx_edges(G, pos=net2.pos(x['network']), edgelist=list(zip(x['route'], x['route'][1:])), edge_color='r', width=3)
+plt.plot(pnt1.x, pnt1.y, 'ro')
+plt.plot(pnt2.x, pnt2.y, 'ro')
+ax.annotate('pnt1', [pnt1.x, pnt1.y], ha='left')
+ax.annotate('pnt2', [pnt2.x, pnt2.y], ha='left')
+plt.axis('on')
+ax.set_aspect('equal')
+ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
+```
+
+![](README_files/figure-commonmark/cell-5-output-1.png)
