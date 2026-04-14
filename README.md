@@ -49,25 +49,38 @@ G = net2.data['roads']
 G
 ```
 
-    <networkx.classes.digraph.DiGraph at 0x7e6091f35f40>
+    <networkx.classes.digraph.DiGraph at 0x7f2bfcedffe0>
 
 Here is a plot of the network:
 
 ``` python
+import matplotlib.pyplot as plt
 import networkx as nx
+fig, ax = plt.subplots()
 nx.draw(G, with_labels=True, pos=net2.pos(G))
+plt.axis('on')
+ax.set_aspect('equal')
+ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
-![](README_files/figure-commonmark/cell-4-output-1.png)
+![](https://bgu-geography.com/net/05-spatial_networks_files/figure-html/fig-roads-network-output-1.png)
 
 ## Example
 
+Calculating the shortest route between two custom points, using
+`net2.route2`:
+
 ``` python
-import matplotlib.pyplot as plt
 import shapely
 pnt1 = shapely.Point(4100, 3100)
 pnt2 = shapely.Point(1100, 3700)
 x = net2.route2(G, pnt1, pnt2, 'length')
+x
+```
+
+Plot of the resulting route and modified network:
+
+``` python
 fig, ax = plt.subplots()
 nx.draw(x['network'], with_labels=True, pos=net2.pos(x['network']), edge_color='grey', width=0.1, ax=ax)
 nx.draw_networkx_edges(G, pos=net2.pos(x['network']), edgelist=list(zip(x['route'], x['route'][1:])), edge_color='r', width=3)
@@ -80,4 +93,4 @@ ax.set_aspect('equal')
 ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
-![](README_files/figure-commonmark/cell-5-output-1.png)
+![](https://bgu-geography.com/net/08-custom_locations_files/figure-html/fig-new-nodes-routing-function-output-1.png)
