@@ -1,7 +1,6 @@
 # `net2`
 
-
-![https://img.shields.io/pypi/v/net2](https://pypi.org/project/net2/.png)
+[![badge](https://img.shields.io/pypi/v/net2)](https://pypi.org/project/net2/)
 
 ## Overview
 
@@ -63,7 +62,7 @@ ax.set_aspect('equal')
 ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
-![](https://bgu-geography.com/net/05-spatial_networks_files/figure-html/fig-roads-network-output-1.png)
+<img src="https://bgu-geography.com/net/05-spatial_networks_files/figure-html/fig-roads-network-output-1.png" align="center" width="450px">
 
 ## Example
 
@@ -93,4 +92,5 @@ ax.set_aspect('equal')
 ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
-![](https://bgu-geography.com/net/08-custom_locations_files/figure-html/fig-new-nodes-routing-function-output-1.png)
+<img src="https://bgu-geography.com/net/08-custom_locations_files/figure-html/fig-new-nodes-routing-function-output-1.png" align="center" width="450px">
+
