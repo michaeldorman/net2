@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import numpy as np
 import geopandas as gpd
+import pandas as pd
 import pyproj
 import shapely
 import networkx as nx
@@ -21,7 +22,7 @@ def prepare_ox(N: nx.MultiDiGraph) -> nx.DiGraph:
         Modified network
     """
     N = N.copy()
-    N = ox.add_edge_speeds(N)
+    N = ox.add_edge_speeds(N, fallback=50)
     N = ox.add_edge_travel_times(N)
     N = ox.convert.to_digraph(N, weight='travel_time')
     N = prepare(N)
@@ -130,12 +131,10 @@ def nodes_to_gdf(N: nx.Graph | nx.DiGraph) -> gpd.GeoDataFrame:
     `GeoDataFrame`
         Point layer of the network nodes
     """
-    geoms = []
-    ids = []
-    for i in N.nodes:
-        ids.append(i)
-        geoms.append(N.nodes[i]['geometry'])
-    nodes = gpd.GeoDataFrame({'id': ids, 'geometry': geoms}, crs=N.graph['crs'])
+    nodes = dict(N.nodes)
+    nodes = pd.DataFrame.from_dict(nodes, orient='index')
+    nodes = nodes.reset_index(names='id')
+    nodes = gpd.GeoDataFrame(nodes, crs=N.graph['crs'])
     return nodes
 
 def edges_to_gdf(N: nx.Graph | nx.DiGraph) -> gpd.GeoDataFrame:

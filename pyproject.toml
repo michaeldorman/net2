@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "net2"
-version = "0.0.9"
+version = "0.0.10"
 authors = [
   { name="Michael Dorman", email="dorman@post.bgu.ac.il" },
 ]
