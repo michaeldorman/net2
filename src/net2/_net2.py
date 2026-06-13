@@ -7,7 +7,7 @@ import shapely
 import networkx as nx
 import osmnx as ox
 
-def prepare_ox(N: nx.MultiDiGraph) -> nx.DiGraph:
+def prepare_ox(N: nx.MultiDiGraph, crs: int=3857) -> nx.DiGraph:
     """
     Pre-process network returned from `ox.graph_from_place` or similar `osmnx` function
     
@@ -15,7 +15,9 @@ def prepare_ox(N: nx.MultiDiGraph) -> nx.DiGraph:
     ----------
     network : `networkx` graph
         Network
-
+    crs: `int`
+        Coordinate Reference System (CRS) to reproject the network into
+        
     Returns
     -------
     `networkx` graph
@@ -25,14 +27,13 @@ def prepare_ox(N: nx.MultiDiGraph) -> nx.DiGraph:
     N = ox.add_edge_speeds(N, fallback=50)
     N = ox.add_edge_travel_times(N)
     N = ox.convert.to_digraph(N, weight='travel_time')
-    N = prepare(N)
+    G = net2.rename_attrs(G, {'travel_time': 'time'})
     for i in N.nodes:
         N.nodes[i]['geometry'] = shapely.Point(N.nodes[i]['x'], N.nodes[i]['y'])
     for u,v in N.edges:
         e = N.edges[u, v]
         if 'geometry' not in e:
-            geom = shapely.LineString([N.nodes[u]['geometry'], N.nodes[v]['geometry']])
-            N[u][v]['geometry'] = geom
+            G.edges[u,v]['geometry'] = shapely.LineString([G.nodes[u]['geometry'], G.nodes[v]['geometry']])
     keep = ['geometry']
     for i in N.nodes:
         for attr in list(N.nodes[i].keys()):
@@ -44,12 +45,76 @@ def prepare_ox(N: nx.MultiDiGraph) -> nx.DiGraph:
             if attr not in keep: 
                 del N.edges[u,v][attr]
     for u,v in N.edges:
-        N[u][v]['speed'] = N[u][v]['speed_kph']
-        del N[u][v]['speed_kph']
-    N = transform(N, 3857)
+        N.edges[u,v]['speed'] = N.edges[u,v]['speed_kph']
+        del N.edges[u,v]['speed_kph']
+    N = transform(N, crs)
     return N
 
-def prepare(N: nx.Graph | nx.DiGraph, ids_to_int=True) -> nx.Graph | nx.DiGraph:
+def rename_attrs(N: nx.Graph | nx.DiGraph, mapping: dict, what: str='both') -> nx.Graph | nx.DiGraph:
+    """
+    Rename attributes of a `networkx` network object
+    
+    Parameters
+    ----------
+    network : `networkx` graph
+        Network
+    mapping: `dict` 
+        Mapping, of the form `{'old_name1':'new_name1','old_name2':'new_name2'}`
+    what: `str`
+        Elements to rename: `'both'` (the default), `'nodes'`, or `'edges'`
+        
+    Returns
+    -------
+    `networkx` graph
+        Modified network
+    """
+    if what in ['nodes', 'both']:
+        for name in mapping:
+            for i in N.nodes:
+                if name in N.nodes[i]:
+                    N.nodes[i][mapping[name]] = N.nodes[i][name]
+                    del N.nodes[i][name]
+    if what in ['edges', 'both']:
+        for name in mapping:
+            for u,v in N.edges:
+                if name in N.edges[u,v]:
+                    N.edges[u,v][mapping[name]] = N.edges[u,v][name]
+                    del N.edges[u,v][name]
+    return N
+
+def geometry_to_shapely(N: nx.Graph | nx.DiGraph, what: str='both') -> nx.Graph | nx.DiGraph:
+    """
+    Transform 'geometry' attributes from 'str' to 'shapely' (e.g., after reading network data from XML file)
+    
+    Parameters
+    ----------
+    network : `networkx` graph
+        Network
+    what: `str`
+        Elements to rename: `'both'` (the default), `'nodes'`, or `'edges'`
+        
+    Returns
+    -------
+    `networkx` graph
+        Modified network
+    """
+    if what in ['nodes', 'both']:
+        for i in N.nodes:
+            if 'geometry' in N.nodes[i]:
+                if isinstance(N.nodes[i]['geometry'], str):
+                    N.nodes[i]['geometry'] = shapely.from_wkt(
+                        N.nodes[i]['geometry']
+                    )
+    if what in ['edges', 'both']:
+        for u,v in N.edges:
+            if 'geometry' in N.edges[u,v]:
+                if isinstance(N.edges[u,v]['geometry'], str):
+                    N.edges[u,v]['geometry'] = shapely.from_wkt(
+                        N.edges[u,v]['geometry']
+                    )
+    return N
+    
+def prepare(N: nx.Graph | nx.DiGraph, ids_to_int: bool=True) -> nx.Graph | nx.DiGraph:
     """
     Standardize spatial `networkx` network object
     
@@ -89,16 +154,16 @@ def prepare(N: nx.Graph | nx.DiGraph, ids_to_int=True) -> nx.Graph | nx.DiGraph:
             if isinstance(N.nodes[i]['geometry'], str):
                 N.nodes[i]['geometry'] = shapely.from_wkt((N.nodes[i]['geometry']))
     for u,v in N.edges:
-        if 'geometry' in N[u][v]:
-            if isinstance(N[u][v]['geometry'], str):
-                N[u][v]['geometry'] = shapely.from_wkt((N[u][v]['geometry']))
-        if 'length' in N[u][v]:
-            N[u][v]['length'] = float(N[u][v]['length'])
-        if 'travel_time' in N[u][v]:
-            N[u][v]['time'] = N[u][v]['travel_time']
-            del N[u][v]['travel_time']
-        if 'time' in N[u][v]:
-            N[u][v]['time'] = float(N[u][v]['time'])
+        if 'geometry' in N.edges[u,v]:
+            if isinstance(N.edges[u,v]['geometry'], str):
+                N.edges[u,v]['geometry'] = shapely.from_wkt((N.edges[u,v]['geometry']))
+        if 'length' in N.edges[u,v]:
+            N.edges[u,v]['length'] = float(N.edges[u,v]['length'])
+        if 'travel_time' in N.edges[u,v]:
+            N.edges[u,v]['time'] = N.edges[u,v]['travel_time']
+            del N.edges[u,v]['travel_time']
+        if 'time' in N.edges[u,v]:
+            N.edges[u,v]['time'] = float(N.edges[u,v]['time'])
     return N
 
 def pos(N: nx.Graph | nx.DiGraph) -> dict:
@@ -206,7 +271,7 @@ def nearest_edge(N: nx.Graph | nx.DiGraph, geom: shapely.geometry.base.BaseGeome
             nearest_edge = i
     return nearest_edge, min_distance
 
-def split_edge(N: nx.Graph | nx.DiGraph, node_id, e, pnt_on_line: shapely.geometry.Point, buffer_size: int | float) -> nx.Graph | nx.DiGraph:
+def split_edge(N: nx.Graph | nx.DiGraph, node_id, e, pnt_on_line: shapely.geometry.Point, buffer_size: int|float) -> nx.Graph | nx.DiGraph:
     pnt_on_line_b = pnt_on_line.buffer(buffer_size)
     first_seg, buff_seg, last_seg = shapely.ops.split(N.edges[e]['geometry'], pnt_on_line_b).geoms
     N.edges[e]['geometry'] = shapely.LineString(list(first_seg.coords) + list(pnt_on_line.coords) + list(last_seg.coords))
@@ -225,7 +290,7 @@ def split_edge(N: nx.Graph | nx.DiGraph, node_id, e, pnt_on_line: shapely.geomet
 def is_same(a, b, threshold=0.001):
     return abs(a - b) < threshold
 
-def add_node(N: nx.Graph | nx.DiGraph, pnt: shapely.geometry.Point, buffer_size=1e-8) -> nx.Graph | nx.DiGraph:
+def add_node(N: nx.Graph | nx.DiGraph, pnt: shapely.geometry.Point, buffer_size: int|float=1e-8) -> nx.Graph | nx.DiGraph:
     """
     Insert new node into an edge
     
@@ -240,8 +305,14 @@ def add_node(N: nx.Graph | nx.DiGraph, pnt: shapely.geometry.Point, buffer_size=
 
     Returns
     -------
-    `networkx` graph
+    `tuple`
+        A tuple with values: 
+        *   `networkx` graph
         Modified network
+        *   `int` (or other immutable)
+        ID of the inserted or original node
+        *   `float`
+        Distance input point to that node
     """
     N = N.copy()
     # Detect nearest edge
@@ -299,7 +370,7 @@ def route1(N: nx.Graph | nx.DiGraph, node_start, node_end, weight: str) -> dict:
     """
     try:
         route = nx.shortest_path(N, node_start, node_end, weight)
-        weight_sum = nx.path_weight(N, route, weight=weight)
+        weight_sum = nx.path_weight(N, route, weight)
         return {'route': route, 'weight': weight_sum}
     except:
         return {'route': np.nan, 'weight': np.nan}
@@ -338,7 +409,7 @@ def route2(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely
     network, node_end, dist_end = add_node(network, end)
     try:
         route = nx.shortest_path(network, node_start, node_end, weight)
-        weight_sum = nx.path_weight(network, route, weight=weight)
+        weight_sum = nx.path_weight(network, route, weight)
     except:
         route = np.nan
         weight_sum = np.nan
@@ -350,7 +421,13 @@ def route2(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely
             'network': network
         }
 
-def route3(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely.geometry.Point, time_weight: str, walking_speed=1.4) -> dict:
+def route3(
+        N: nx.Graph | nx.DiGraph, 
+        start: shapely.geometry.Point, 
+        end: shapely.geometry.Point, 
+        time_weight: str, 
+        walking_speed: int|float=1.4
+    ) -> dict:
     """
     Find optimal route between specified point locations, while inserting new nodes into existing edges when necessary, while choosing between 'walking' (in a straight line) or 'walking+driving' (walking to and from network, then driving along network).
     
@@ -377,13 +454,14 @@ def route3(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely
             The selected travel mode, either `'walking+driving'` or `'walking'`
     """
     import math
+    result = route2(N, start, end, time_weight)
+    time_start = result['dist_start'] / walking_speed
+    time_end = result['dist_end'] / walking_speed
+    time_driving_and_walking = time_start + result['weight'] + time_end
+    if np.isnan(result['weight']):
+        return {'weight': np.nan, 'mode': np.nan}
     dist = math.sqrt(((start.x - end.x) ** 2) + ((start.y - end.y) ** 2))
     time_walking = dist / walking_speed
-    try:
-        result = route2(N, start, end, time_weight)
-        time_driving_and_walking = result['dist_start']/walking_speed + result['weight'] + result['dist_end']/walking_speed
-    except:
-        return {'weight': np.nan, 'mode': np.nan}
     if time_driving_and_walking <= time_walking:
         return {'weight': time_driving_and_walking, 'mode': 'walking+driving'}
     else:
@@ -415,7 +493,12 @@ def create_grid(bounds: list | tuple, res: int | float, crs=None) -> gpd.GeoData
     for x in cols:
         for y in rows:
             polygons.append(
-                shapely.Polygon([(x,y), (x+res, y), (x+res, y-res), (x, y-res)])
+                shapely.Polygon([
+                    (x,y), 
+                    (x+res, y), 
+                    (x+res, y-res), 
+                    (x, y-res)
+                ])
             )
     grid = gpd.GeoDataFrame({'geometry': polygons}, crs=crs)
     sel = grid.intersects(shapely.box(*bounds))
@@ -438,18 +521,29 @@ def route_to_gdf(N: nx.Graph | nx.DiGraph, route: list) -> gpd.GeoDataFrame:
     `GeoDataFrame`
         Line layer representing the route
     """
-    route_edges = nx.path_graph(route).edges
     if len(route) == 1:
-        result = []
         pnt = N.nodes[route[0]]['geometry']
         line = shapely.LineString([pnt, pnt])
-        result = gpd.GeoDataFrame([{'from': route[0], 'to': route[0], 'geometry': line}], crs=N.graph['crs'])
-    if len(route) > 1:
+        result = gpd.GeoDataFrame([{
+            'source': route[0], 
+            'target': route[0], 
+            'geometry': line,
+            'length': 0,
+            'time': 0
+        }])
+    else:
+        edges = list(zip(route, route[1:]))
         result = []
-        for u,v in route_edges:
-            x = N.edges[u,v]['geometry']
-            result.append({'from': u, 'to': v, 'geometry': x})
+        for u,v in edges:
+            e = N.edges[u,v]
+            e['source'] = u
+            e['target'] = v
+            result.append(e)
+        result = pd.DataFrame(result)
         result = gpd.GeoDataFrame(result, crs=N.graph['crs'])
+        cols1 = ['source', 'target']
+        cols2 = [col for col in result.columns if col not in cols1]
+        result = result[cols1 + cols2]
     return result
 
 def transform(N: nx.Graph | nx.DiGraph, to_crs) -> nx.Graph | nx.DiGraph:
@@ -472,8 +566,12 @@ def transform(N: nx.Graph | nx.DiGraph, to_crs) -> nx.Graph | nx.DiGraph:
     from_crs = N.graph['crs']
     transformer = pyproj.Transformer.from_crs(from_crs, to_crs, always_xy=True)
     for i in N.nodes:
-        N.nodes[i]['geometry'] = shapely.transform(N.nodes[i]['geometry'], transformer.transform, interleaved=False)
+        N.nodes[i]['geometry'] = shapely.transform(
+            N.nodes[i]['geometry'], transformer.transform, interleaved=False
+        )
     for u,v in N.edges:
-        N.edges[u, v]['geometry'] = shapely.transform(N.edges[u, v]['geometry'], transformer.transform, interleaved=False)
+        N.edges[u, v]['geometry'] = shapely.transform(
+            N.edges[u, v]['geometry'], transformer.transform, interleaved=False
+        )
     N.graph['crs'] = to_crs
     return N

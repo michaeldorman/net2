@@ -1,6 +1,7 @@
 __all__ = [
     'prepare_ox',
-    'prepare',
+    'rename_attrs',
+    'geometry_to_shapely',
     'pos',
     'nodes_to_gdf',
     'edges_to_gdf',
@@ -16,7 +17,8 @@ __all__ = [
     'data',
 ]
 from ._net2 import prepare_ox
-from ._net2 import prepare
+from ._net2 import rename_attrs
+from ._net2 import geometry_to_shapely
 from ._net2 import pos
 from ._net2 import nodes_to_gdf
 from ._net2 import edges_to_gdf
