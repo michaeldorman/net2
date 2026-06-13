@@ -62,7 +62,7 @@ ax.set_aspect('equal')
 ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
-<img src="https://bgu-geography.com/net/05-spatial_networks_files/figure-html/fig-roads-network-output-1.png" align="center" width="450px">
+<img src="https://raw.githubusercontent.com/michaeldorman/net2/main/fig-roads-to-directed-output-1.png" align="center" width="450px">
 
 ## Example
 
@@ -92,5 +92,5 @@ ax.set_aspect('equal')
 ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
-<img src="https://bgu-geography.com/net/08-custom_locations_files/figure-html/fig-new-nodes-routing-function-output-1.png" align="center" width="450px">
+<img src="https://raw.githubusercontent.com/michaeldorman/net2/main/fig-new-nodes-routing-function-output-1.png" align="center" width="450px">
 
