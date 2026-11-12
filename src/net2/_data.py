@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # Sample data
 from networkx import parse_graphml
-from net2._net2 import prepare
+from net2._net2 import geometry_to_shapely
 x = '''<?xml version='1.0' encoding='utf-8'?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
   <key id="d5" for="edge" attr.name="time" attr.type="double" />
@@ -257,6 +257,9 @@ x = '''<?xml version='1.0' encoding='utf-8'?>
     <data key="d0">None</data>
   </graph>
 </graphml>'''
-G = parse_graphml(x)
-G = prepare(G)
+G = parse_graphml(x, node_type=int)
+G = geometry_to_shapely(G)
+G.graph['crs'] = None
 data = {'roads': G}
+
+

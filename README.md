@@ -57,9 +57,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 fig, ax = plt.subplots()
 nx.draw(G, with_labels=True, pos=net2.pos(G))
-plt.axis('on')
 ax.set_aspect('equal')
-ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True);
 ```
 
 <img src="https://raw.githubusercontent.com/michaeldorman/net2/main/fig-roads-to-directed-output-1.png" align="center" width="450px">

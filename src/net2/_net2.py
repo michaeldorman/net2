@@ -50,7 +50,11 @@ def prepare_ox(N: nx.MultiDiGraph, crs: int=3857) -> nx.DiGraph:
     N = transform(N, crs)
     return N
 
-def rename_attrs(N: nx.Graph | nx.DiGraph, mapping: dict, what: str='both') -> nx.Graph | nx.DiGraph:
+def rename_attrs(
+        N: nx.Graph | nx.DiGraph, 
+        mapping: dict, 
+        what: str='both'
+    ) -> nx.Graph | nx.DiGraph:
     """
     Rename attributes of a `networkx` network object
     
@@ -112,58 +116,6 @@ def geometry_to_shapely(N: nx.Graph | nx.DiGraph, what: str='both') -> nx.Graph 
                     N.edges[u,v]['geometry'] = shapely.from_wkt(
                         N.edges[u,v]['geometry']
                     )
-    return N
-    
-def prepare(N: nx.Graph | nx.DiGraph, ids_to_int: bool=True) -> nx.Graph | nx.DiGraph:
-    """
-    Standardize spatial `networkx` network object
-    
-    Parameters
-    ----------
-    network : `networkx` graph
-        Network
-    ids_to_int: `bool` 
-        Whether to replace node IDs with `int`
-
-    Returns
-    -------
-    `networkx` graph
-        Modified network
-    """
-    N = N.copy()
-    if 'crs' not in N.graph:
-        N.graph['crs'] = None
-    else:
-        if isinstance(N.graph['crs'], str):
-            if N.graph['crs'] == 'None':
-                N.graph['crs'] = None
-            else:
-                try:
-                    N.graph['crs'] = int(N.graph['crs'].replace('epsg:', ''))
-                except Exception as e: 
-                    print("'crs' graph attribute is invalid")
-                    print(e)
-    if ids_to_int:
-        try:
-            mapping = {i: int(i) for i in N.nodes}
-            N = nx.relabel_nodes(N, mapping)
-        except:
-            N = nx.convert_node_labels_to_integers(N, first_label=0)
-    for i in N.nodes:
-        if 'geometry' in N.nodes[i]:
-            if isinstance(N.nodes[i]['geometry'], str):
-                N.nodes[i]['geometry'] = shapely.from_wkt((N.nodes[i]['geometry']))
-    for u,v in N.edges:
-        if 'geometry' in N.edges[u,v]:
-            if isinstance(N.edges[u,v]['geometry'], str):
-                N.edges[u,v]['geometry'] = shapely.from_wkt((N.edges[u,v]['geometry']))
-        if 'length' in N.edges[u,v]:
-            N.edges[u,v]['length'] = float(N.edges[u,v]['length'])
-        if 'travel_time' in N.edges[u,v]:
-            N.edges[u,v]['time'] = N.edges[u,v]['travel_time']
-            del N.edges[u,v]['travel_time']
-        if 'time' in N.edges[u,v]:
-            N.edges[u,v]['time'] = float(N.edges[u,v]['time'])
     return N
 
 def pos(N: nx.Graph | nx.DiGraph) -> dict:
@@ -282,8 +234,17 @@ def split_edge(N: nx.Graph | nx.DiGraph, node_id, e, pnt_on_line: shapely.geomet
     p = N.nodes[e[1]]['geometry']
     line2 = filter(p.intersects, lines.geoms)
     line2 = list(line2)[0]
-    N.add_edge(e[0], node_id, geometry=line1, length=line1.length, time=N.edges[e]['time'] * (line1.length / N.edges[e]['geometry'].length))
-    N.add_edge(node_id, e[1], geometry=line2, length=line2.length, time=N.edges[e]['time'] * (line2.length / N.edges[e]['geometry'].length))
+    N.add_edge(e[0], node_id, geometry=line1)
+    N.add_edge(node_id, e[1], geometry=line2)
+    if 'length' in N.edges[e]:
+        N.edges[e[0], node_id]['length'] = line1.length
+        N.edges[node_id, e[1]]['length'] = line2.length
+    if 'speed' in N.edges[e]:
+        N.edges[e[0], node_id]['speed'] = N.edges[e]['speed']
+        N.edges[node_id, e[1]]['speed'] = N.edges[e]['speed']
+    if 'time' in N.edges[e]:
+        N.edges[e[0], node_id]['time'] = N.edges[e]['time'] * (line1.length / N.edges[e]['geometry'].length)
+        N.edges[node_id, e[1]]['time'] = N.edges[e]['time'] * (line2.length / N.edges[e]['geometry'].length)
     N.remove_edge(*e)
     return N
 
@@ -375,7 +336,12 @@ def route1(N: nx.Graph | nx.DiGraph, node_start, node_end, weight: str) -> dict:
     except:
         return {'route': np.nan, 'weight': np.nan}
 
-def route2(N: nx.Graph | nx.DiGraph, start: shapely.geometry.Point, end: shapely.geometry.Point, weight: str) -> dict:
+def route2(
+        N: nx.Graph | nx.DiGraph, 
+        start: shapely.geometry.Point, 
+        end: shapely.geometry.Point, 
+        weight: str
+    ) -> dict:
     """
     Find optimal route between specified point locations, while inserting new nodes into existing edges when necessary.
     
@@ -455,11 +421,11 @@ def route3(
     """
     import math
     result = route2(N, start, end, time_weight)
+    if np.isnan(result['weight']):
+        return {'weight': np.nan, 'mode': np.nan}
     time_start = result['dist_start'] / walking_speed
     time_end = result['dist_end'] / walking_speed
     time_driving_and_walking = time_start + result['weight'] + time_end
-    if np.isnan(result['weight']):
-        return {'weight': np.nan, 'mode': np.nan}
     dist = math.sqrt(((start.x - end.x) ** 2) + ((start.y - end.y) ** 2))
     time_walking = dist / walking_speed
     if time_driving_and_walking <= time_walking:
@@ -493,12 +459,7 @@ def create_grid(bounds: list | tuple, res: int | float, crs=None) -> gpd.GeoData
     for x in cols:
         for y in rows:
             polygons.append(
-                shapely.Polygon([
-                    (x,y), 
-                    (x+res, y), 
-                    (x+res, y-res), 
-                    (x, y-res)
-                ])
+                shapely.Polygon([(x,y), (x+res, y), (x+res, y-res), (x, y-res)])
             )
     grid = gpd.GeoDataFrame({'geometry': polygons}, crs=crs)
     sel = grid.intersects(shapely.box(*bounds))
@@ -535,7 +496,7 @@ def route_to_gdf(N: nx.Graph | nx.DiGraph, route: list) -> gpd.GeoDataFrame:
         edges = list(zip(route, route[1:]))
         result = []
         for u,v in edges:
-            e = N.edges[u,v]
+            e = N.edges[u,v].copy()
             e['source'] = u
             e['target'] = v
             result.append(e)
